@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drocart Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+</head>
+<body class="admin-body">
+
+<div id="toast"><span class="toast-icon">✦</span><span id="toast-msg"></span></div>
+
+<!-- Sidebar -->
+<aside class="admin-sidebar">
+  <a href="/" class="nav-logo" style="display:block;padding:1.5rem 1.5rem 2rem">Drocart</a>
+  <nav class="admin-nav">
+    <a href="#" class="admin-nav-link active" onclick="Admin.showSection('dashboard',this)">📊 Dashboard</a>
+    <a href="#" class="admin-nav-link" onclick="Admin.showSection('orders',this)">📦 Orders</a>
+    <a href="#" class="admin-nav-link" onclick="Admin.showSection('products',this)">🛍️ Products</a>
+    <a href="#" class="admin-nav-link" onclick="Admin.showSection('customers',this)">👥 Customers</a>
+    <hr style="border-color:var(--border);margin:1rem 1.5rem">
+    <a href="/" class="admin-nav-link">← Back to Store</a>
+  </nav>
+</aside>
+
+<!-- Main -->
+<main class="admin-main">
+
+  <!-- DASHBOARD -->
+  <section id="section-dashboard" class="admin-section">
+    <h1 class="admin-page-title">Dashboard</h1>
+    <div class="stats-grid" id="stats-grid">
+      <div class="stat-card skeleton-stat"></div>
+      <div class="stat-card skeleton-stat"></div>
+      <div class="stat-card skeleton-stat"></div>
+      <div class="stat-card skeleton-stat"></div>
+    </div>
+    <div class="admin-card">
+      <div class="admin-card-header">
+        <h3>Recent Orders</h3>
+      </div>
+      <table class="admin-table" id="recent-orders-table">
+        <thead><tr><th>Order #</th><th>Customer</th><th>Total</th><th>Status</th><th>Date</th></tr></thead>
+        <tbody id="recent-orders-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ORDERS -->
+  <section id="section-orders" class="admin-section" style="display:none">
+    <h1 class="admin-page-title">All Orders</h1>
+    <div class="admin-card">
+      <table class="admin-table">
+        <thead><tr><th>Order #</th><th>Customer</th><th>Total</th><th>Payment</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
+        <tbody id="all-orders-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- PRODUCTS -->
+  <section id="section-products" class="admin-section" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2rem">
+      <h1 class="admin-page-title" style="margin:0">Products</h1>
+      <button class="btn-primary" onclick="Admin.showAddProduct()">+ Add Product</button>
+    </div>
+
+    <!-- Add Product Form -->
+    <div class="admin-card" id="add-product-form" style="display:none;margin-bottom:2rem">
+      <h3 style="margin-bottom:1.5rem">Add New Product</h3>
+      <div class="form-row">
+        <div class="form-group"><label>Name</label><input type="text" id="ap-name" class="input-field"></div>
+        <div class="form-group"><label>Category</label>
+          <select id="ap-cat" class="input-field">
+            <option value="1">Electronics</option>
+            <option value="2">Fashion</option>
+            <option value="3">Jewelry</option>
+            <option value="4">Home & Living</option>
+            <option value="5">Beauty</option>
+            <option value="6">Sports</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label>Description</label><textarea id="ap-desc" class="input-field" rows="3"></textarea></div>
+      <div class="form-row">
+        <div class="form-group"><label>Price (₹)</label><input type="number" id="ap-price" class="input-field"></div>
+        <div class="form-group"><label>Old Price (₹)</label><input type="number" id="ap-oldprice" class="input-field" placeholder="Optional"></div>
+        <div class="form-group"><label>Stock</label><input type="number" id="ap-stock" class="input-field" value="100"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Emoji</label><input type="text" id="ap-emoji" class="input-field" value="📦" style="width:80px"></div>
+        <div class="form-group"><label>Badge</label>
+          <select id="ap-badge" class="input-field">
+            <option value="">None</option>
+            <option value="new">New</option>
+            <option value="sale">Sale</option>
+            <option value="hot">Hot</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Featured</label>
+          <select id="ap-featured" class="input-field">
+            <option value="0">No</option>
+            <option value="1">Yes</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:1rem;margin-top:1rem">
+        <button class="btn-primary" onclick="Admin.addProduct()">Add Product</button>
+        <button class="btn-secondary" onclick="document.getElementById('add-product-form').style.display='none'">Cancel</button>
+      </div>
+    </div>
+
+    <div class="admin-card">
+      <table class="admin-table">
+        <thead><tr><th>Icon</th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Rating</th><th>Actions</th></tr></thead>
+        <tbody id="products-table-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- CUSTOMERS -->
+  <section id="section-customers" class="admin-section" style="display:none">
+    <h1 class="admin-page-title">Customers</h1>
+    <div class="admin-card">
+      <p style="color:var(--mute);text-align:center;padding:3rem">
+        Customer management coming soon. Connect to <code>/api/admin/users</code>
+      </p>
+    </div>
+  </section>
+
+</main>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+</body>
+</html>
