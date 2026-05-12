@@ -1,5 +1,6 @@
 # 🛒 Drocart — Full Stack E-Commerce
-
+# pip3 install flask flask-mysqldb flask-login flask-bcrypt flask-cors python-dotenv
+# sudo dnf install mariadb105-devel gcc python3-devel -y
 A production-ready e-commerce application built with **Flask**, **MySQL**, and a dynamic 3D frontend.
 
 ---
