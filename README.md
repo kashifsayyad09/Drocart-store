@@ -3,6 +3,10 @@
 # sudo dnf install mariadb105-devel gcc python3-devel -y
 A production-ready e-commerce application built with **Flask**, **MySQL**, and a dynamic 3D frontend.
 
+UPDATE users
+SET role = 'admin'
+WHERE email = 'kashifsayyad09@gmail.com';
+
 ---
 
 ## 📁 Project Structure
