@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS products (
     old_price     DECIMAL(10,2),
     stock         INT             DEFAULT 0,
     sku           VARCHAR(80)     UNIQUE,
-    emoji         VARCHAR(10)     DEFAULT '📦',
+    emoji         VARCHAR(10)     DEFAULT '',
     badge         ENUM('new','sale','hot','') DEFAULT '',
     rating        DECIMAL(3,2)    DEFAULT 0.00,
     review_count  INT             DEFAULT 0,
@@ -211,12 +211,12 @@ CREATE TABLE IF NOT EXISTS subscribers (
 -- ============================================================
 
 INSERT INTO categories (name, slug, description, icon, sort_order) VALUES
-('Electronics',    'electronics',  'Gadgets, audio, cameras & more',  '🎧', 1),
-('Fashion',        'fashion',      'Clothing, shoes & accessories',   '👟', 2),
-('Jewelry',        'jewelry',      'Rings, necklaces & luxury pieces','💎', 3),
-('Home & Living',  'home-living',  'Furniture, decor & appliances',   '🏠', 4),
-('Beauty',         'beauty',       'Skincare, makeup & fragrances',   '🌹', 5),
-('Sports',         'sports',       'Equipment & activewear',          '⚽', 6);
+('Electronics',    'electronics',  'Gadgets, audio, cameras & more',  '', 1),
+('Fashion',        'fashion',      'Clothing, shoes & accessories',   '', 2),
+('Jewelry',        'jewelry',      'Rings, necklaces & luxury pieces','', 3),
+('Home & Living',  'home-living',  'Furniture, decor & appliances',   '', 4),
+('Beauty',         'beauty',       'Skincare, makeup & fragrances',   '', 5),
+('Sports',         'sports',       'Equipment & activewear',          '', 6);
 
 INSERT INTO users (name, email, password, role) VALUES
 ('Admin User', 'admin@drocart.com',
