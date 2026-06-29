@@ -1,0 +1,105 @@
+# ============================================================
+#  DROCART — Root Docker Compose
+#  Orchestrates three independent services:
+#    db        MySQL 8.0
+#    backend   Flask API + Socket.IO        (./backend)
+#    frontend  Static SPA served by Nginx   (./frontend)
+#
+#  frontend/ and backend/ are fully separate folders/images —
+#  this file lives OUTSIDE both, at the project root, and wires
+#  them together purely over the network.
+# ============================================================
+version: "3.9"
+
+services:
+
+  # ── Database ────────────────────────────────────────────
+  db:
+    image: mysql:8.0
+    container_name: drocart_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: drocart
+      MYSQL_USER: drocart_admin
+      MYSQL_PASSWORD: drocart_pass
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./backend/database.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "3306:3306"
+    networks: [backend_net]
+    healthcheck:
+      test: ["CMD","mysqladmin","ping","-h","localhost","-u","root","-prootpass"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ── Backend API ─────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: drocart_backend
+    restart: unless-stopped
+    environment:
+      APP_ENV: development
+      SECRET_KEY: local-dev-secret-key
+      MYSQL_HOST: db
+      MYSQL_USER: drocart_admin
+      MYSQL_PASSWORD: drocart_pass
+      MYSQL_DB: drocart
+      # Frontend's origin — required for CORS + credentialed cookies
+      ALLOWED_ORIGINS: http://localhost:8080
+      COOKIE_SAMESITE: Lax
+      COOKIE_SECURE: "false"
+      GMAIL_ADDRESS: ${GMAIL_ADDRESS:-}
+      GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: http://localhost:8080/auth/google/callback
+      PORT: 5000
+    ports:
+      - "5000:5000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [backend_net, app_net]
+    healthcheck:
+      test: ["CMD","curl","-f","http://localhost:5000/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ── Frontend (static SPA) ───────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: drocart_frontend
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks: [app_net]
+    healthcheck:
+      test: ["CMD","wget","-qO-","http://localhost/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  db_data:
+
+networks:
+  # backend_net: db <-> backend only (isolated, no internet/frontend access)
+  backend_net:
+    driver: bridge
+    internal: true
+  # app_net: backend <-> frontend, both reachable from host via published ports
+  app_net:
+    driver: bridge

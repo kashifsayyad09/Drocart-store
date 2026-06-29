@@ -1,0 +1,32 @@
+project    = "drocart"
+env        = "prod"
+aws_region = "ap-south-1"
+
+vpc_cidr      = "10.0.0.0/16"
+public_cidrs  = ["10.0.1.0/24","10.0.2.0/24"]
+private_cidrs = ["10.0.11.0/24","10.0.12.0/24"]
+db_cidrs      = ["10.0.21.0/24","10.0.22.0/24"]
+admin_ip      = "YOUR_IP/32"
+
+key_name          = "drocart-key"
+web_instance_type = "t3.small"
+app_instance_type = "t3.medium"
+web_min = 2; web_max = 6; web_desired = 2
+app_min = 2; app_max = 8; app_desired = 2
+
+db_instance_class = "db.t3.medium"
+db_name           = "drocart"
+db_user           = "drocart_admin"
+db_password       = "ChangeMe@Prod2025!"
+create_replica    = true
+
+domain             = "drocart.com"
+acm_cert_arn       = "arn:aws:acm:ap-south-1:ACCOUNT:certificate/CERT_ID"
+create_hosted_zone = false
+
+flask_secret_key     = "generate-64-char-random-string"
+google_client_id     = "xxxx.apps.googleusercontent.com"
+google_client_secret = "your-google-secret"
+google_redirect_uri  = "https://drocart.com/auth/google/callback"
+
+alert_email = "devops@drocart.com"

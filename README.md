@@ -1,193 +1,140 @@
-# 🛒 Drocart — Full Stack E-Commerce
+# 🛒 Drocart — Split Frontend / Backend Architecture
 
-A production-ready e-commerce application built with **Flask**, **MySQL**, and a dynamic 3D frontend.
-
----
-
-## 📁 Project Structure
+Frontend and backend are **two completely separate codebases**, each with
+their own Dockerfile, deployable independently. `docker-compose.yml` lives
+at the project root, outside both, and wires them together over a shared
+Docker network — neither folder depends on the other at build time.
 
 ```
 drocart/
-├── app.py                  # Flask application & all API routes
-├── database.sql            # MySQL schema + seed data
-├── requirements.txt        # Python dependencies
-├── .env.example            # Environment variable template
-│
-├── templates/
-│   ├── index.html          # Main storefront
-│   └── admin.html          # Admin dashboard
-│
-└── static/
-    ├── css/
-    │   ├── style.css       # Main stylesheet (dark luxury theme)
-    │   └── admin.css       # Admin dashboard styles
-    └── js/
-        ├── main.js         # All storefront logic
-        └── admin.js        # Admin dashboard logic
+├── docker-compose.yml      ← orchestrates db + backend + frontend (root level)
+├── deploy.sh               ← AWS deployment CLI
+├── backend/                ← standalone Flask JSON API + Socket.IO
+│   ├── app.py
+│   ├── database.sql
+│   ├── requirements.txt
+│   ├── gunicorn.conf.py
+│   ├── Dockerfile
+│   └── .env.example
+├── frontend/                ← standalone static SPA (Nginx-served)
+│   ├── index.html
+│   ├── auth.html
+│   ├── css/{style.css,otp.css}
+│   ├── js/{api.js,app.js,pages.js,otp.js}
+│   ├── nginx/nginx.conf
+│   └── Dockerfile
+├── terraform/                AWS three-tier infra (VPC, dual ALBs, RDS, ASGs)
+├── scripts/userdata.sh        EC2 bootstrap (web tier = frontend, app tier = backend)
+└── configs/drocart.service     systemd unit reference
 ```
 
----
+## Architecture
 
-## 🚀 Setup Instructions
-
-### 1. Prerequisites
-- Python 3.9+
-- MySQL 8.0+
-- pip
-
-### 2. Clone & Install
-```bash
-cd drocart
-pip install -r requirements.txt
+```
+Internet
+   │
+[External ALB] → [EC2 Web Tier: Nginx serving frontend/]
+                         │  /api/*, /socket.io/ → proxied to:
+                         ▼
+                  [Internal ALB] → [EC2 App Tier: backend/ Flask API]
+                                          │
+                                          ▼
+                                   [RDS MySQL Multi-AZ]
 ```
 
-### 3. Configure Environment
+The browser talks **directly** to the backend's own URL for all `/api/*`
+calls and Socket.IO — set via `window.DROCART_API_BASE` in
+`frontend/index.html` and `frontend/auth.html`. In production this should
+be your backend's public domain (e.g. `https://api.drocart.com`); the Nginx
+web tier also proxies `/api/*` so either path works.
+
+## Why split
+
+- **Independent deploys** — ship a frontend bug fix without touching the API, or scale the backend without rebuilding static assets.
+- **Independent scaling** — Nginx (cheap, stateless) and Flask (CPU/DB-bound) scale on different curves.
+- **Separate teams/repos** — each folder is a complete, self-contained project that could live in its own git repo.
+- **CORS-aware by design** — the backend explicitly allows the frontend's origin (`ALLOWED_ORIGINS`) rather than assuming same-origin.
+
+## Local Dev (Docker Compose)
+
 ```bash
-cp .env.example .env
-# Edit .env with your MySQL credentials
+cp backend/.env.example backend/.env
+# edit backend/.env — set GMAIL_ADDRESS, GMAIL_APP_PASSWORD
+
+docker-compose up -d --build
+open http://localhost:8080        # frontend
+curl  http://localhost:5000/health # backend
 ```
 
-### 4. Set Up Database
+Compose wires three services:
+- `db` — MySQL 8.0, seeded from `backend/database.sql`
+- `backend` — Flask API on port 5000, in network `backend_net` (with db, isolated) + `app_net` (reachable from frontend)
+- `frontend` — Nginx static SPA on port 8080, in `app_net` only — cannot reach the database directly
+
+## AWS Deployment
+
 ```bash
-mysql -u root -p < database.sql
+cp terraform/terraform.tfvars.example terraform/terraform.tfvars
+# edit terraform.tfvars
+
+./deploy.sh upload      # sync backend/ and frontend/ to their own S3 buckets
+./deploy.sh apply        # create infra (~15 min for RDS)
+./deploy.sh seed-db      # seed MySQL schema + data
+./deploy.sh roll         # rolling deploy
+./deploy.sh status       # health check
 ```
 
-### 5. Run the App
-```bash
-python app.py
+Or run the whole pipeline: `./deploy.sh full`
+
+EC2 Web Tier instances pull from the frontend S3 bucket; EC2 App Tier
+instances pull from the backend S3 bucket — each tier only ever sees its
+own half of the codebase.
+
+## Google App Password Setup (OTP Email Delivery)
+
+1. Enable 2-Step Verification: https://myaccount.google.com/security
+2. Generate App Password: https://myaccount.google.com/apppasswords
+3. Select app "Mail", copy the 16-character password
+4. Set in `backend/.env`:
+   ```
+   GMAIL_ADDRESS=yourname@gmail.com
+   GMAIL_APP_PASSWORD=abcdefghijklmnop
+   ```
+
+## CORS / Cookies Note
+
+Because frontend and backend are different origins, the backend sets
+`ALLOWED_ORIGINS` to the frontend's exact URL (wildcards don't work with
+credentialed cookies). For HTTPS production, also set:
 ```
-Visit → **http://localhost:5000**
-Admin → **http://localhost:5000/admin**
+COOKIE_SAMESITE=None
+COOKIE_SECURE=true
+```
+For local HTTP dev, `COOKIE_SAMESITE=Lax` and `COOKIE_SECURE=false` (the
+defaults) work fine on `localhost`.
 
----
+## Default Credentials
 
-## 🔑 Default Credentials
+| Role | Email | Password |
+|---|---|---|
+| Admin | admin@drocart.com | Admin@123 |
+| Support | agent@drocart.com | Admin@123 |
+| Customer | aanya@example.com | Admin@123 |
 
-| Role     | Email                | Password   |
-|----------|----------------------|------------|
-| Admin    | admin@drocart.com    | admin123   |
-| Customer | test@drocart.com     | admin123   |
+> Change all passwords before production.
 
-> ⚠️ Change these immediately in production!
+## deploy.sh commands
 
----
-
-## 🛠️ API Reference
-
-### Auth
-| Method | Endpoint              | Description       |
-|--------|-----------------------|-------------------|
-| POST   | `/api/auth/register`  | Register user     |
-| POST   | `/api/auth/login`     | Login             |
-| POST   | `/api/auth/logout`    | Logout            |
-| GET    | `/api/auth/me`        | Get current user  |
-
-### Products
-| Method | Endpoint                    | Description              |
-|--------|-----------------------------|--------------------------|
-| GET    | `/api/products`             | List products (paginated)|
-| GET    | `/api/products/<slug>`      | Single product detail    |
-| GET    | `/api/categories`           | All categories           |
-
-**Query params:** `?category=electronics&featured=1&q=watch&sort=price_asc&page=1&limit=12`
-
-### Cart (login required)
-| Method | Endpoint              | Description     |
-|--------|-----------------------|-----------------|
-| GET    | `/api/cart`           | Get cart        |
-| POST   | `/api/cart`           | Add item        |
-| PUT    | `/api/cart/<id>`      | Update quantity |
-| DELETE | `/api/cart/<id>`      | Remove item     |
-| DELETE | `/api/cart/clear`     | Clear cart      |
-
-### Orders (login required)
-| Method | Endpoint              | Description     |
-|--------|-----------------------|-----------------|
-| GET    | `/api/orders`         | My orders       |
-| GET    | `/api/orders/<id>`    | Order detail    |
-| POST   | `/api/orders`         | Place order     |
-
-### Wishlist (login required)
-| Method | Endpoint                      | Description       |
-|--------|-------------------------------|-------------------|
-| GET    | `/api/wishlist`               | Get wishlist      |
-| POST   | `/api/wishlist/<product_id>`  | Toggle wishlist   |
-
-### Coupons
-| Method | Endpoint              | Description   |
-|--------|-----------------------|---------------|
-| POST   | `/api/coupons/apply`  | Apply coupon  |
-
-**Coupon codes:** `DROCART10` (10% off), `WELCOME500` (₹500 off), `SALE20` (20% off)
-
-### Admin (admin role required)
-| Method | Endpoint                        | Description         |
-|--------|---------------------------------|---------------------|
-| GET    | `/api/admin/stats`              | Dashboard stats     |
-| GET    | `/api/admin/orders`             | All orders          |
-| PATCH  | `/api/admin/orders/<id>`        | Update order status |
-| POST   | `/api/admin/products`           | Add product         |
-| DELETE | `/api/admin/products/<id>`      | Delete product      |
-
----
-
-## ✨ Features
-
-### Frontend
-- 🌌 **Three.js 3D hero scene** — rotating TorusKnot with orbiting spheres
-- 🎯 **Custom magnetic cursor** with ring follower
-- ✨ **Particle network** background (160 particles, live connections)
-- 🎠 **Animated marquee** ticker strip
-- 🔍 **Live search** with 400ms debounce
-- 🛒 **Slide-in cart sidebar** with real-time sync
-- 💳 **Full checkout flow** with address + payment selection
-- 🎟️ **Coupon code** system
-- ❤️ **Wishlist** toggle per product
-- 🔔 **Toast notifications** system
-- 📱 **Fully responsive** down to mobile
-
-### Backend
-- 🔐 **BCrypt** password hashing
-- 🍪 **Session-based auth** (30-day persistent)
-- 📄 **Pagination** on all list endpoints
-- 🔍 **Full-text search** (MySQL FULLTEXT index)
-- 📦 **Stock management** (auto-decrements on order)
-- 🧾 **Auto order numbers** (MySQL trigger)
-- 📊 **Admin dashboard** with stats + order management
-- 🗄️ **Stored procedures** for rating recalculation
-
-### Database
-- 12 tables with proper foreign keys & indexes
-- Seed data (categories, products, users, coupons)
-- MySQL stored procedure + trigger included
-
----
-
-## 🎨 Design Tokens
-
-| Token       | Value      | Usage                |
-|-------------|------------|----------------------|
-| `--ink`     | `#0a0a0f`  | Main background      |
-| `--gold`    | `#f5c842`  | Primary accent       |
-| `--accent`  | `#7c6fff`  | Violet accent        |
-| `--rose`    | `#ff5f7e`  | Red accent / danger  |
-| `--teal`    | `#00e5c4`  | Green/teal accent    |
-
-Fonts: **Syne** (display/headings) + **DM Sans** (body)
-
----
-
-## 🔧 Production Notes
-
-1. Set `DEBUG = False` in `app.py`
-2. Use `gunicorn` instead of Flask dev server
-3. Configure a proper `SECRET_KEY` in `.env`
-4. Set up HTTPS (SSL certificate)
-5. Use environment variables for all secrets
-6. Add rate limiting for auth endpoints
-
-```bash
-# Production start
-pip install gunicorn
-gunicorn -w 4 -b 0.0.0.0:5000 app:app
+```
+plan              Terraform dry run
+apply             Create/update AWS infrastructure
+upload            Sync backend/ + frontend/ to their S3 buckets
+upload-backend    Sync only backend/
+upload-frontend   Sync only frontend/
+seed-db           Run database.sql against RDS
+roll              ASG rolling instance refresh
+status            Health check + ASG status
+rollback          Revert to previous launch template
+full              upload + apply + seed-db + roll
+destroy           Tear down all infrastructure
 ```
