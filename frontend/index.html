@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Drocart — Shop the Future. Premium ecommerce with real-time tracking and live chat.">
+<meta name="theme-color" content="#0a0a0f">
+<title>Drocart — Shop the Future</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/otp.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛒</text></svg>">
+
+<!-- ════════════════════════════════════════════════════════
+     BACKEND CONFIG — frontend and backend are separate services.
+     Set this to wherever the backend API container is reachable.
+     Overridden automatically by nginx env substitution in prod
+     (see frontend/nginx/nginx.conf + docker-compose.yml).
+     ════════════════════════════════════════════════════════ -->
+<script>
+  window.DROCART_API_BASE = "http://localhost:5000";
+</script>
+</head>
+<body>
+
+<div id="cursor"></div>
+<div id="cursor-ring"></div>
+<div id="page-loader"><div class="loader-ring"></div></div>
+<div id="toast-container"></div>
+
+<nav id="navbar">
+  <a href="/" class="nav-logo">Drocart</a>
+  <ul class="nav-links">
+    <li><a href="/">Home</a></li>
+    <li><a href="/products">Products</a></li>
+    <li><a href="/products?category=electronics">Electronics</a></li>
+    <li><a href="/products?category=fashion">Fashion</a></li>
+    <li><a href="/chat">Support</a></li>
+  </ul>
+  <div class="nav-search-wrap">
+    <div class="nav-search-box">
+      <span class="search-icon">⌕</span>
+      <input type="search" id="nav-search-input" placeholder="Search products…" autocomplete="off">
+    </div>
+    <div id="search-dropdown"></div>
+  </div>
+  <div class="nav-right">
+    <button class="notif-btn" id="nav-notif-btn" style="display:none" onclick="NavUI.toggleNotifs()">
+      🔔<span class="notif-badge" id="nav-notif-badge" style="display:none">0</span>
+    </button>
+    <div id="nav-auth-btn">
+      <a href="/login" class="btn-ghost btn-sm">Log In</a>
+      <a href="/signup" class="btn-primary btn-sm">Sign Up</a>
+    </div>
+    <div id="nav-user-menu" style="display:none">
+      <a href="/account" class="nav-avatar-btn" id="nav-avatar-wrap"><span id="nav-user-initial">U</span></a>
+      <span id="nav-user-name" class="nav-user-name"></span>
+    </div>
+    <button class="nav-cart-btn" onclick="location.href='/cart'">
+      🛒 <span id="nav-cart-text">Cart</span>
+      <span class="cart-badge" id="nav-cart-badge" style="display:none">0</span>
+    </button>
+  </div>
+</nav>
+
+<div id="notif-dropdown" class="notif-dropdown" style="display:none"></div>
+
+<main id="app-content">
+  <div id="page-loading-init" style="display:flex;align-items:center;justify-content:center;height:80vh"><div class="loader-ring"></div></div>
+</main>
+
+<footer id="app-footer">
+  <div class="footer-grid">
+    <div>
+      <a href="/" class="footer-logo-link">Drocart</a>
+      <p class="footer-tagline">The future of online shopping. Curated quality, delivered with care.</p>
+      <div class="footer-socials"><a href="#" class="social-btn">𝕏</a><a href="#" class="social-btn">in</a><a href="#" class="social-btn">ig</a></div>
+    </div>
+    <div><div class="footer-col-title">Shop</div><ul class="footer-links">
+      <li><a href="/products">All Products</a></li><li><a href="/products?category=electronics">Electronics</a></li><li><a href="/products?category=fashion">Fashion</a></li>
+    </ul></div>
+    <div><div class="footer-col-title">Account</div><ul class="footer-links">
+      <li><a href="/account">My Profile</a></li><li><a href="/orders">My Orders</a></li><li><a href="/wishlist">Wishlist</a></li>
+    </ul></div>
+    <div><div class="footer-col-title">Support</div><ul class="footer-links">
+      <li><a href="/chat">Live Chat</a></li><li><a href="/orders">Track Order</a></li>
+    </ul></div>
+  </div>
+  <div class="footer-bottom">
+    <span class="footer-copy">© 2025 Drocart Inc. All rights reserved.</span>
+    <div class="footer-legal"><a href="#">Privacy</a><a href="#">Terms</a></div>
+  </div>
+</footer>
+
+<button id="floating-chat-btn" onclick="location.href='/chat'" title="Live Support">💬</button>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/app.js"></script>
+<script src="/js/pages.js"></script>
+<script src="/js/otp.js"></script>
+
+<script>
+/* ──────────────────────────────────────────────────────────
+   CLIENT-SIDE ROUTING
+   No backend templating anymore — the page name, slug, and
+   query params are derived straight from window.location.
+   ────────────────────────────────────────────────────────── */
+(function(){
+  const path = location.pathname;
+  const params = new URLSearchParams(location.search);
+  let page = 'home', slug = '', order_id = '', order_number = '', category = '', search_q = '';
+
+  if (path === '/' || path === '') page = 'home';
+  else if (path === '/products') { page = 'products'; category = params.get('category') || ''; search_q = params.get('q') || ''; }
+  else if (path.startsWith('/product/')) { page = 'product'; slug = path.split('/')[2] || ''; }
+  else if (path === '/cart') page = 'cart';
+  else if (path === '/checkout') page = 'checkout';
+  else if (path === '/payment') page = 'payment';
+  else if (path === '/orders') page = 'orders';
+  else if (path.startsWith('/order/')) { page = 'order'; order_id = path.split('/')[2] || ''; }
+  else if (path.startsWith('/track/')) { page = 'tracking'; order_number = path.split('/')[2] || ''; }
+  else if (path === '/account') page = 'account';
+  else if (path === '/wishlist') page = 'wishlist';
+  else if (path === '/chat') page = 'chat';
+  else if (path === '/admin') page = 'admin';
+  else if (path === '/auth/google/callback') page = 'google_callback';
+  else page = 'not_found';
+
+  window.DROCART_CONFIG = { page, slug, order_id, order_number, category, search_q };
+})();
+
+(function(){
+  const c=document.getElementById('cursor'),r=document.getElementById('cursor-ring');
+  if(!c)return;
+  let mx=0,my=0,rx=0,ry=0;
+  document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;c.style.left=mx+'px';c.style.top=my+'px';});
+  (function t(){rx+=(mx-rx)*.1;ry+=(my-ry)*.1;r.style.left=rx+'px';r.style.top=ry+'px';requestAnimationFrame(t);})();
+})();
+
+(function(){
+  const canvas=document.createElement('canvas');
+  canvas.style.cssText='position:fixed;inset:0;z-index:0;pointer-events:none';
+  document.body.insertBefore(canvas,document.body.firstChild);
+  const ctx=canvas.getContext('2d');let W,H,p=[];
+  const resize=()=>{W=canvas.width=innerWidth;H=canvas.height=innerHeight;};
+  resize();window.addEventListener('resize',resize);
+  const COLS=['255,200,66','124,111,255','0,229,196','255,95,126'];
+  class P{constructor(){this.reset();}reset(){this.x=Math.random()*W;this.y=Math.random()*H;this.r=Math.random()*1.2+.3;this.vx=(Math.random()-.5)*.22;this.vy=(Math.random()-.5)*.22;this.a=Math.random()*.3+.04;this.col=COLS[Math.floor(Math.random()*COLS.length)];}update(){this.x+=this.vx;this.y+=this.vy;if(this.x<0||this.x>W||this.y<0||this.y>H)this.reset();}draw(){ctx.beginPath();ctx.arc(this.x,this.y,this.r,0,Math.PI*2);ctx.fillStyle=`rgba(${this.col},${this.a})`;ctx.fill();}}
+  for(let i=0;i<130;i++)p.push(new P());
+  (function loop(){ctx.clearRect(0,0,W,H);for(let i=0;i<p.length;i++){for(let j=i+1;j<p.length;j++){const dx=p[i].x-p[j].x,dy=p[i].y-p[j].y,d=Math.hypot(dx,dy);if(d<90){ctx.beginPath();ctx.moveTo(p[i].x,p[i].y);ctx.lineTo(p[j].x,p[j].y);ctx.strokeStyle=`rgba(124,111,255,${.04*(1-d/90)})`;ctx.lineWidth=.5;ctx.stroke();}}}p.forEach(x=>{x.update();x.draw();});requestAnimationFrame(loop);})();
+})();
+
+window.addEventListener('scroll',()=>{
+  const n=document.getElementById('navbar');
+  if(n)n.style.background=scrollY>60?'rgba(10,10,15,.94)':'rgba(10,10,15,.7)';
+});
+
+const NavUI={
+  _open:false,
+  async toggleNotifs(){
+    const dd=document.getElementById('notif-dropdown');
+    if(this._open){dd.style.display='none';this._open=false;return;}
+    this._open=true;dd.style.display='block';
+    dd.innerHTML='<div class="page-loading" style="padding:1.5rem">Loading…</div>';
+    try{
+      const r=await API.get('/notifications');
+      const notifs=r.data?.notifications||[];
+      dd.innerHTML=`<div class="nd-header"><h4>Notifications</h4><span class="nd-mark" onclick="NavUI.markAll()">Mark all read</span></div>`
+        +(notifs.length?notifs.map(n=>`<div class="notif-item ${n.is_read?'':'notif-unread'}" onclick="NavUI.openN('${n.url||'/'}',${n.id})"><div class="notif-icon">${n.icon||'🔔'}</div><div class="notif-body"><div class="notif-title">${n.title}</div><div class="notif-text">${n.body||''}</div></div></div>`).join(''):'<div style="padding:2rem;text-align:center;color:var(--mute);font-size:.84rem">No notifications</div>');
+    }catch(_){dd.innerHTML='<div style="padding:1.5rem;color:var(--mute)">Could not load</div>';}
+  },
+  openN(url,id){API.post('/notifications/read',{id}).catch(()=>{});document.getElementById('notif-dropdown').style.display='none';this._open=false;location.href=url;},
+  async markAll(){await API.post('/notifications/read',{}).catch(()=>{});Store.set('notifCount',0);document.getElementById('notif-dropdown').style.display='none';this._open=false;}
+};
+document.addEventListener('click',e=>{
+  const dd=document.getElementById('notif-dropdown'),btn=document.getElementById('nav-notif-btn');
+  if(NavUI._open&&dd&&!dd.contains(e.target)&&!btn?.contains(e.target)){dd.style.display='none';NavUI._open=false;}
+});
+
+Store.on('cartCount',n=>{const b=document.getElementById('nav-cart-badge');if(b){b.textContent=n;b.style.display=n>0?'flex':'none';}const t=document.getElementById('nav-cart-text');if(t)t.textContent=n>0?`(${n})`:'Cart';});
+Store.on('notifCount',n=>{const b=document.getElementById('nav-notif-badge');if(b){b.textContent=n;b.style.display=n>0?'flex':'none';}});
+Store.on('user',u=>{const nb=document.getElementById('nav-notif-btn');if(nb)nb.style.display=u?'flex':'none';});
+
+if(typeof io!=='undefined'){
+  // Socket.IO connects to the backend's own origin, not same-origin.
+  const sock=io(window.DROCART_API_BASE, {transports:['websocket'], withCredentials:true});
+  sock.on('notification',n=>{Store.set('notifCount',(Store.get('notifCount')||0)+1);Toast.show(`${n.icon||'🔔'} ${n.title}`,'info',5000);});
+  sock.on('tracking_update',d=>{Toast.show(`🚚 Order update: ${d.title}`,'info',5000);});
+}
+</script>
+
+</body>
+</html>

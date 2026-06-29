@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title id="auth-title">Sign In — Drocart</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Syne:wght@700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/otp.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛒</text></svg>">
+
+<!-- Backend runs as a separate service — see frontend/index.html for details -->
+<script>
+  window.DROCART_API_BASE = "http://localhost:5000";
+</script>
+</head>
+<body class="auth-body">
+
+<div id="toast-container"></div>
+<div id="cursor"></div>
+<div id="cursor-ring"></div>
+
+<div class="auth-layout">
+  <div class="auth-left">
+    <a href="/" class="auth-logo">Drocart</a>
+
+    <!-- ═══ LOGIN CARD (shown on /login) ═══ -->
+    <div class="auth-card" id="login-card">
+      <h1 class="auth-h1">Welcome back</h1>
+      <p class="auth-sub">Sign in to your Drocart account</p>
+
+      <button class="btn-google" id="btn-google-login">
+        <svg viewBox="0 0 24 24" width="20" height="20">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+        </svg>
+        Continue with Google
+      </button>
+      <div class="auth-divider"><span>or</span></div>
+
+      <div class="auth-mode-tabs">
+        <button class="auth-mode-tab active" id="tab-pw" onclick="Auth.setMode('password')">Password</button>
+        <button class="auth-mode-tab" id="tab-otp" onclick="Auth.setMode('otp')">OTP Login</button>
+      </div>
+
+      <div id="form-password">
+        <div class="form-group"><label>Email Address</label><input type="email" id="l-email" class="input-field" placeholder="you@example.com" autocomplete="email"></div>
+        <div class="form-group">
+          <label>Password <a href="#" class="forgot-link" onclick="event.preventDefault();Auth.forgotPassword()">Forgot?</a></label>
+          <div class="input-pw-wrap"><input type="password" id="l-pw" class="input-field" placeholder="••••••••" autocomplete="current-password"><button class="pw-toggle" onclick="Auth.togglePw('l-pw')">👁</button></div>
+        </div>
+        <button class="btn-primary full-w" id="btn-login" onclick="Auth.login()">Sign In →</button>
+      </div>
+
+      <div id="form-otp" style="display:none">
+        <div class="form-group"><label>Email or Phone</label><input type="text" id="l-otp-target" class="input-field" placeholder="email or +91 phone number"></div>
+        <button class="btn-primary full-w" id="btn-send-otp" onclick="Auth.sendOTP()">Send OTP →</button>
+        <div id="otp-verify-block" style="display:none;margin-top:1.2rem"></div>
+      </div>
+
+      <div id="form-totp" style="display:none">
+        <div class="totp-info"><div class="totp-icon">🔐</div><p>Open <strong>Google Authenticator</strong> and enter the 6-digit code.</p></div>
+        <div id="totp-mount"></div>
+      </div>
+
+      <p class="auth-switch">New to Drocart? <a href="/signup">Create account →</a></p>
+    </div>
+
+    <!-- ═══ SIGNUP CARD (shown on /signup) ═══ -->
+    <div class="auth-card" id="signup-card" style="display:none">
+      <h1 class="auth-h1">Create account</h1>
+      <p class="auth-sub">Join 48,000+ Drocart shoppers</p>
+
+      <button class="btn-google" id="btn-google-signup">
+        <svg viewBox="0 0 24 24" width="20" height="20">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+        </svg>
+        Sign up with Google
+      </button>
+      <div class="auth-divider"><span>or</span></div>
+
+      <div id="signup-step-1">
+        <div class="form-group"><label>Full Name</label><input type="text" id="s-name" class="input-field" placeholder="Your full name" autocomplete="name"></div>
+        <div class="form-group"><label>Email Address</label><input type="email" id="s-email" class="input-field" placeholder="you@example.com" autocomplete="email"></div>
+        <div class="form-group"><label>Phone <span style="color:var(--mute);font-weight:400">(optional)</span></label><input type="tel" id="s-phone" class="input-field" placeholder="+91 98765 43210"></div>
+        <div class="form-group">
+          <label>Password</label>
+          <div class="input-pw-wrap"><input type="password" id="s-pw" class="input-field" placeholder="Min 8 characters" autocomplete="new-password"><button class="pw-toggle" onclick="Auth.togglePw('s-pw')">👁</button></div>
+          <div class="pw-strength" id="pw-strength"></div>
+        </div>
+        <button class="btn-primary full-w" id="btn-signup" onclick="Auth.register()">Create Account →</button>
+      </div>
+
+      <div id="signup-step-2" style="display:none">
+        <div class="verify-banner">
+          <div class="vb-icon">📧</div>
+          <h3>Verify your email</h3>
+          <p>We sent a 6-digit OTP to <strong id="verify-email-display"></strong></p>
+        </div>
+        <div id="otp-mount-signup" style="margin-top:1rem"></div>
+      </div>
+
+      <p class="auth-switch">Already have an account? <a href="/login">Sign in →</a></p>
+      <p class="auth-terms">By signing up you agree to our <a href="#">Terms</a> and <a href="#">Privacy Policy</a>.</p>
+    </div>
+  </div>
+
+  <div class="auth-right">
+    <div class="auth-right-content">
+      <div class="auth-right-tagline">
+        <h2>Everything you need,<br>delivered to your door.</h2>
+        <p>Drocart combines premium products with world-class technology and real-time tracking.</p>
+      </div>
+      <div class="auth-features">
+        <div class="auth-feature"><div class="af-icon-wrap"><span>🔐</span></div><div><strong>Multi-Layer Security</strong><p>OTP via Gmail, Google OAuth &amp; TOTP 2FA.</p></div></div>
+        <div class="auth-feature"><div class="af-icon-wrap"><span>🚚</span></div><div><strong>Real-Time Tracking</strong><p>Live map tracking from warehouse to door.</p></div></div>
+        <div class="auth-feature"><div class="af-icon-wrap"><span>💬</span></div><div><strong>24/7 Live Chat</strong><p>AI bot + human agents always available.</p></div></div>
+        <div class="auth-feature"><div class="af-icon-wrap"><span>📧</span></div><div><strong>Instant OTP Email</strong><p>Styled verification emails via Google App Password.</p></div></div>
+        <div class="auth-feature"><div class="af-icon-wrap"><span>↩️</span></div><div><strong>Easy Returns</strong><p>7-day hassle-free return policy.</p></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="forgot-modal" class="modal-overlay" style="display:none">
+  <div class="modal-box">
+    <div class="modal-header"><h3 class="modal-title">Reset Password</h3><button class="modal-close-btn" onclick="document.getElementById('forgot-modal').style.display='none'">✕</button></div>
+    <div class="modal-body">
+      <div id="forgot-step-1">
+        <div class="form-group"><label>Email Address</label><input type="email" id="forgot-email" class="input-field" placeholder="your@email.com"></div>
+        <button class="btn-primary full-w" onclick="Auth.sendResetOTP()">Send Reset OTP →</button>
+      </div>
+      <div id="forgot-step-2" style="display:none">
+        <div id="forgot-otp-mount"></div>
+        <div id="forgot-pw-field" style="display:none;margin-top:1.2rem">
+          <div class="form-group">
+            <label>New Password</label>
+            <div class="input-pw-wrap"><input type="password" id="reset-pw" class="input-field" placeholder="Min 8 characters"><button class="pw-toggle" onclick="Auth.togglePw('reset-pw')">👁</button></div>
+          </div>
+          <button class="btn-primary full-w" id="btn-do-reset" onclick="Auth.doResetPassword()">Reset Password →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/app.js"></script>
+<script src="/js/otp.js"></script>
+
+<script>
+(function(){
+  const isSignup = location.pathname === '/signup';
+  document.getElementById('login-card').style.display  = isSignup ? 'none' : 'flex';
+  document.getElementById('signup-card').style.display = isSignup ? 'flex' : 'none';
+  document.getElementById('auth-title').textContent = isSignup ? 'Create Account — Drocart' : 'Sign In — Drocart';
+})();
+
+const Auth = {
+  _mode: 'password', _email: '', _pendingEmail: '', _resetOTP: '',
+
+  setMode(mode) {
+    this._mode = mode;
+    document.getElementById('tab-pw').classList.toggle('active', mode === 'password');
+    document.getElementById('tab-otp').classList.toggle('active', mode === 'otp');
+    document.getElementById('form-password').style.display = mode === 'password' ? 'block' : 'none';
+    document.getElementById('form-otp').style.display = mode === 'otp' ? 'block' : 'none';
+  },
+
+  togglePw(id) { const i = document.getElementById(id); i.type = i.type === 'password' ? 'text' : 'password'; },
+
+  async login() {
+    const email = document.getElementById('l-email')?.value.trim().toLowerCase();
+    const pw = document.getElementById('l-pw')?.value;
+    if (!email || !pw) { Toast.show('Please fill all fields', 'error'); return; }
+    const btn = document.getElementById('btn-login');
+    btn.disabled = true; btn.textContent = 'Signing in…';
+    try {
+      const r = await API.post('/auth/login', { email, password: pw });
+      if (r.data?.two_fa_required) {
+        this._pendingEmail = email;
+        document.getElementById('form-password').style.display = 'none';
+        document.getElementById('form-totp').style.display = 'block';
+        OTPModule.build({
+          containerId: 'totp-mount', digits: 6, target: email, kind: '2fa',
+          onSuccess: async (code) => {
+            try {
+              const vr = await API.post('/auth/totp/verify', { email, code });
+              if (vr.success) { Toast.show('Welcome back 🔐', 'success'); setTimeout(() => location.href = sessionStorage.getItem('redir') || '/', 900); }
+              else OTPModule.showError(vr.error || 'Invalid code');
+            } catch(e) { OTPModule.showError(e.message); }
+          },
+        });
+        return;
+      }
+      if (r.success) { Toast.show(`Welcome back, ${r.data.name.split(' ')[0]}! 👋`, 'success'); setTimeout(() => location.href = sessionStorage.getItem('redir') || '/', 800); }
+      else Toast.show(r.error || 'Login failed', 'error');
+    } catch(e) { Toast.show(e.message, 'error'); }
+    finally { btn.disabled = false; btn.textContent = 'Sign In →'; }
+  },
+
+  async sendOTP() {
+    const target = document.getElementById('l-otp-target')?.value.trim();
+    if (!target) { Toast.show('Enter email or phone', 'error'); return; }
+    const btn = document.getElementById('btn-send-otp');
+    btn.disabled = true; btn.textContent = 'Sending…';
+    try {
+      const payload = target.includes('@') ? { email: target, kind: 'login' } : { phone: target, kind: 'login' };
+      const r = await API.post('/auth/otp/send', payload);
+      if (!r.success) { Toast.show(r.error || 'Failed to send OTP', 'error'); return; }
+      Toast.show('OTP sent to your email! 📧', 'success');
+      this._email = target;
+      const block = document.getElementById('otp-verify-block');
+      block.style.display = 'block';
+      block.innerHTML = '<div id="otp-mount-login"></div>';
+      OTPModule.build({
+        containerId: 'otp-mount-login', digits: 6, target, kind: 'login',
+        onSuccess: async (otp) => {
+          try {
+            const vr = await API.post('/auth/otp/verify', { email: target.includes('@') ? target : undefined, phone: !target.includes('@') ? target : undefined, otp, kind: 'login' });
+            if (vr.success) { Toast.show('Verified! Welcome 🎉', 'success'); setTimeout(() => location.href = sessionStorage.getItem('redir') || '/', 900); }
+            else OTPModule.showError(vr.error || 'Invalid OTP');
+          } catch(e) { OTPModule.showError(e.message); }
+        },
+        onResend: () => this.sendOTP(),
+      });
+      let s = 59; btn.disabled = true;
+      const t = setInterval(() => { btn.textContent = `Resend in ${s}s`; s--; if (s < 0) { clearInterval(t); btn.textContent = 'Resend OTP'; btn.disabled = false; } }, 1000);
+    } catch(e) { Toast.show(e.message, 'error'); btn.disabled = false; btn.textContent = 'Send OTP →'; }
+  },
+
+  async googleLogin() { try { const r = await API.get('/auth/google'); if (r.success) location.href = r.data.url; } catch(e) { Toast.show('Could not start Google login', 'error'); } },
+
+  async register() {
+    const name = document.getElementById('s-name')?.value.trim();
+    const email = document.getElementById('s-email')?.value.trim().toLowerCase();
+    const phone = document.getElementById('s-phone')?.value.trim();
+    const pw = document.getElementById('s-pw')?.value;
+    if (!name || !email || !pw) { Toast.show('Please fill all required fields', 'error'); return; }
+    if (pw.length < 8) { Toast.show('Password must be at least 8 characters', 'error'); return; }
+    const btn = document.getElementById('btn-signup');
+    btn.disabled = true; btn.textContent = 'Creating…';
+    try {
+      const r = await API.post('/auth/register', { name, email, password: pw, phone });
+      if (r.success) {
+        this._email = email;
+        document.getElementById('verify-email-display').textContent = email;
+        document.getElementById('signup-step-1').style.display = 'none';
+        document.getElementById('signup-step-2').style.display = 'block';
+        Toast.show('Account created! Check your email for the OTP 📧', 'success');
+        OTPModule.build({
+          containerId: 'otp-mount-signup', digits: 6, target: email, kind: 'email_verify',
+          onSuccess: async (otp) => {
+            try {
+              const vr = await API.post('/auth/otp/verify', { email, otp, kind: 'email_verify' });
+              if (vr.success) { Toast.show('Email verified! Welcome to Drocart 🎉', 'success'); setTimeout(() => location.href = '/', 1200); }
+              else OTPModule.showError(vr.error || 'Invalid OTP');
+            } catch(e) { OTPModule.showError(e.message); }
+          },
+          onResend: async () => { await API.post('/auth/otp/send', { email, kind: 'email_verify' }); Toast.show('OTP resent!', 'info'); },
+        });
+      } else Toast.show(r.error, 'error');
+    } catch(e) { Toast.show(e.message, 'error'); }
+    finally { btn.disabled = false; btn.textContent = 'Create Account →'; }
+  },
+
+  forgotPassword() {
+    document.getElementById('forgot-modal').style.display = 'flex';
+    document.getElementById('forgot-step-1').style.display = 'block';
+    document.getElementById('forgot-step-2').style.display = 'none';
+    document.getElementById('forgot-pw-field').style.display = 'none';
+  },
+
+  async sendResetOTP() {
+    const email = document.getElementById('forgot-email')?.value.trim().toLowerCase();
+    if (!email) { Toast.show('Enter your email', 'error'); return; }
+    try {
+      await API.post('/auth/forgot-password', { email });
+      this._email = email; this._resetOTP = '';
+      document.getElementById('forgot-step-1').style.display = 'none';
+      document.getElementById('forgot-step-2').style.display = 'block';
+      Toast.show('Reset OTP sent to your email 📧', 'info');
+      OTPModule.build({
+        containerId: 'forgot-otp-mount', digits: 6, target: email, kind: 'reset',
+        onSuccess: (otp) => { this._resetOTP = otp; document.getElementById('forgot-pw-field').style.display = 'block'; document.getElementById('reset-pw')?.focus(); },
+        onResend: async () => { await API.post('/auth/forgot-password', { email }); Toast.show('OTP resent!', 'info'); },
+      });
+    } catch(e) { Toast.show(e.message, 'error'); }
+  },
+
+  async doResetPassword() {
+    const pw = document.getElementById('reset-pw')?.value;
+    const otp = this._resetOTP;
+    if (!otp) { Toast.show('Please complete OTP verification first', 'error'); return; }
+    if (!pw || pw.length < 8) { Toast.show('Password must be at least 8 characters', 'error'); return; }
+    const btn = document.getElementById('btn-do-reset');
+    btn.disabled = true; btn.textContent = 'Resetting…';
+    try {
+      const r = await API.post('/auth/reset-password', { email: this._email, otp, password: pw });
+      if (r.success) { document.getElementById('forgot-modal').style.display = 'none'; Toast.show('Password reset! Please sign in.', 'success'); }
+      else OTPModule.showError(r.error || 'Invalid OTP');
+    } catch(e) { Toast.show(e.message, 'error'); }
+    finally { btn.disabled = false; btn.textContent = 'Reset Password →'; }
+  },
+};
+
+document.getElementById('btn-google-login')?.addEventListener('click', () => Auth.googleLogin());
+document.getElementById('btn-google-signup')?.addEventListener('click', () => Auth.googleLogin());
+document.getElementById('l-pw')?.addEventListener('keydown', e => { if (e.key === 'Enter') Auth.login(); });
+
+document.getElementById('s-pw')?.addEventListener('input', e => {
+  const pw = e.target.value;
+  const s = [/[a-z]/,/[A-Z]/,/[0-9]/,/[^a-zA-Z0-9]/].filter(r => r.test(pw)).length;
+  const labels = ['','Weak','Fair','Good','Strong'];
+  const colors = ['','#ef4444','#f59e0b','#3b82f6','#22c55e'];
+  const el = document.getElementById('pw-strength');
+  el.innerHTML = pw.length >= 4 ? `<div class="pw-bar"><div style="width:${s*25}%;background:${colors[s]};height:100%;border-radius:4px;transition:width .3s"></div></div><span style="color:${colors[s]};font-size:.75rem">${labels[s]}</span>` : '';
+});
+
+(function(){
+  const c = document.getElementById('cursor'), r = document.getElementById('cursor-ring');
+  if (!c) return;
+  let mx=0,my=0,rx=0,ry=0;
+  document.addEventListener('mousemove', e => { mx=e.clientX; my=e.clientY; c.style.left=mx+'px'; c.style.top=my+'px'; });
+  (function t(){ rx+=(mx-rx)*.1; ry+=(my-ry)*.1; r.style.left=rx+'px'; r.style.top=ry+'px'; requestAnimationFrame(t); })();
+})();
+
+if (location.search.includes('code=') && location.pathname === '/login') {
+  const code = new URLSearchParams(location.search).get('code');
+  if (code) {
+    API.post('/auth/google/callback', { code }).then(r => {
+      if (r.success) { Toast.show(`Welcome, ${r.data.name.split(' ')[0]}! 🎉`, 'success'); setTimeout(() => location.href = sessionStorage.getItem('redir') || '/', 800); }
+      else { Toast.show(r.error || 'Google login failed', 'error'); setTimeout(() => location.href = '/login', 1500); }
+    });
+  }
+}
+</script>
+
+<style>
+body.auth-body { cursor: none; background: var(--ink); }
+.auth-layout { display: flex; min-height: 100vh; }
+.auth-left { width: 480px; flex-shrink: 0; padding: 2.5rem 3rem; background: var(--ink2); border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 1.1rem; overflow-y: auto; }
+.auth-logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.7rem; background: linear-gradient(135deg, var(--gold), var(--rose)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-decoration: none; margin-bottom: .4rem; }
+.auth-h1 { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.9rem; letter-spacing: -.03em; }
+.auth-sub { font-size: .88rem; color: var(--mute); margin-top: -.5rem; }
+.auth-right { flex: 1; background: linear-gradient(135deg, #0a0a0f 0%, #0d0820 40%, #050d1a 100%); display: flex; align-items: center; justify-content: center; padding: 3rem; position: relative; overflow: hidden; }
+.auth-right::before { content:''; position:absolute; inset:0; background: radial-gradient(circle at 30% 50%, rgba(124,111,255,.12) 0%, transparent 60%), radial-gradient(circle at 70% 30%, rgba(245,200,66,.08) 0%, transparent 50%); }
+.auth-right-content { max-width: 400px; position: relative; z-index: 1; }
+.auth-right-tagline { margin-bottom: 2.4rem; }
+.auth-right-tagline h2 { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.8rem; line-height: 1.2; letter-spacing: -.03em; margin-bottom: .7rem; }
+.auth-right-tagline p { color: var(--mute); font-size: .9rem; line-height: 1.6; }
+.auth-features { display: flex; flex-direction: column; gap: 1.3rem; }
+.auth-feature { display: flex; align-items: flex-start; gap: 1rem; }
+.af-icon-wrap { width: 40px; height: 40px; border-radius: 11px; background: var(--glass); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 1.15rem; flex-shrink: 0; }
+.auth-feature strong { display: block; font-weight: 600; font-size: .87rem; margin-bottom: .18rem; }
+.auth-feature p { color: var(--mute); font-size: .8rem; line-height: 1.5; }
+.auth-mode-tabs { display: flex; border: 1px solid var(--border); border-radius: 100px; padding: 3px; }
+.auth-mode-tab { flex: 1; padding: .52rem 1rem; border-radius: 100px; background: none; border: none; color: var(--mute); font-size: .83rem; }
+.auth-mode-tab.active { background: var(--glass); color: var(--white); }
+.verify-banner { text-align: center; padding: 1.4rem; background: rgba(124,111,255,.08); border: 1px solid rgba(124,111,255,.2); border-radius: var(--radius); }
+.vb-icon { font-size: 2.4rem; margin-bottom: .65rem; }
+.verify-banner h3 { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.05rem; margin-bottom: .38rem; }
+.verify-banner p { font-size: .84rem; color: var(--silver); }
+.auth-terms { font-size: .74rem; color: var(--mute); text-align: center; line-height: 1.5; }
+.auth-terms a { color: var(--accent); }
+.auth-card { display: flex; flex-direction: column; gap: .95rem; }
+#otp-mount-login .otp-page-wrapper, #otp-mount-signup .otp-page-wrapper, #totp-mount .otp-page-wrapper, #forgot-otp-mount .otp-page-wrapper { min-height: unset; padding: 0; background: transparent; display: block; }
+#otp-mount-login .otp-container, #otp-mount-signup .otp-container, #totp-mount .otp-container, #forgot-otp-mount .otp-container { max-width: 100%; border-radius: 20px; padding: 32px 24px; border: 1px solid var(--border); background: rgba(255,255,255,.03); }
+#forgot-modal[style*="flex"] { display: flex !important; }
+@media(max-width:900px) { .auth-right { display: none; } .auth-left { width: 100%; border-right: none; } }
+</style>
+
+</body>
+</html>

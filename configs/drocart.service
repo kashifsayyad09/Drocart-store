@@ -1,0 +1,25 @@
+[Unit]
+Description=Drocart Backend API (Gunicorn + eventlet)
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ec2-user
+Group=ec2-user
+WorkingDirectory=/home/ec2-user/drocart/backend
+EnvironmentFile=/home/ec2-user/drocart/backend/.env
+ExecStart=/home/ec2-user/drocart/venv/bin/gunicorn -c /home/ec2-user/drocart/backend/gunicorn.conf.py app:app
+Restart=always
+RestartSec=5
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=drocart
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
