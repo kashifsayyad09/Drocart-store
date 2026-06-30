@@ -1,7 +1,7 @@
 'use strict';
 // Backend runs as a separate service. Set via window.DROCART_API_BASE
 // (injected in index.html / auth.html) — falls back to localhost:5000 for dev.
-const API_BASE = (window.DROCART_API_BASE || 'http://localhost:5000') + '/api';
+const API_BASE = "/api";
 const API = (() => {
   const request = async (method, url, body = null) => {
     const cfg = { method, headers: { 'Content-Type': 'application/json' }, credentials: 'include' };
